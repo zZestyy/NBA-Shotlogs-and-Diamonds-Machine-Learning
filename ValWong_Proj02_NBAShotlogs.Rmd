@@ -1,0 +1,239 @@
+---
+title: "Proj 2 - NBA Shot Logs"
+author: "Val Wong - vmw170030"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+## NBA Shot Logs Data Set
+Data on shots taken during the 2014-2015 season, who took the shot, where on the floor was the shot taken from, who was the nearest defender, how far away was the nearest defender, time on the shot clock, and much more. The column titles are generally self-explanatory.
+
+Useful for evaluating who the best shooter is, who the best defender is, the hot-hand hypothesis, etc. Scraped from NBA's REST API.
+
+Source: https://www.kaggle.com/dansbecker/nba-shot-logs
+
+### Step 1 - Loading the data
+```{r}
+NBA_shotlogs <- read.csv("nba_shot_logs.csv")
+numOfRows <- NROW(NBA_shotlogs) 
+print(paste("Total Number of Rows in NBA Shot logs: ", numOfRows, " rows."))
+```
+
+### Step 2 - Data Cleaning
+First, we determine which columns contain NA values. Then, apply a fix/mitigation to columns with NA values. In this data set, the column 'Shot_Clock' contains NAs, which is replaced with either the mean or median of the column, with the function 'fix_NA'. Lastly, we factor columns that need to be factored to levels.
+```{r}
+# Check NAs in each column
+print("Overall NAs:")
+sum(is.na(NBA_shotlogs) == TRUE)
+print("SHOT_RESULT NAs:")
+sum(is.na(NBA_shotlogs$SHOT_RESULT) == TRUE)
+print("TOUCH_TIME NAs:")
+sum(is.na(NBA_shotlogs$TOUCH_TIME) == TRUE)
+print("DRIBBLES NAs:")
+sum(is.na(NBA_shotlogs$DRIBBLES) == TRUE)
+print("SHOT_DIST NAs:")
+sum(is.na(NBA_shotlogs$SHOT_DIST) == TRUE)
+print("CLOSE_DEF_DIST NAs:")
+sum(is.na(NBA_shotlogs$CLOSE_DEF_DIST) == TRUE)
+print("SHOT_CLOCK NAs:")
+sum(is.na(NBA_shotlogs$SHOT_CLOCK) == TRUE)
+
+# function to mitigate presence of NAs in data set
+# sample call: df$x <- fix_NA(df$x, 1)
+fix_NA <- function(x, mean_mode){ 
+  if (mean_mode == 1) { # use mean
+    ifelse(!is.na(x), x, mean(x, na.rm=TRUE))
+  } else {
+    ifelse(!is.na(x), x, median(x, na.rm=TRUE))
+  }
+}
+
+# fix NAs
+NBA_shotlogs$SHOT_CLOCK <- fix_NA(NBA_shotlogs$SHOT_CLOCK, 1) 
+
+# Factoring Columns that have values that indicate levels
+NBA_shotlogs$W <- factor(NBA_shotlogs$W)
+NBA_shotlogs$LOCATION <- factor(NBA_shotlogs$LOCATION)
+NBA_shotlogs$SHOT_RESULT <- factor(NBA_shotlogs$SHOT_RESULT)
+NBA_shotlogs$PTS_TYPE <- factor(NBA_shotlogs$PTS_TYPE)
+```
+
+### Step 3 - Data Exploration
+Display Column Names and Structure of NBA Shot logs data set.
+```{r}
+names(NBA_shotlogs) # data exploration function 1
+str(NBA_shotlogs) # data exploration function 2
+```
+
+**Preview First and Last Few Rows**
+```{r}
+head(NBA_shotlogs) # data exploration function 3
+tail(NBA_shotlogs) # data exploration function 4
+```
+
+**Summary of entire NBA Shot logs data set.**
+```{r}
+summary(NBA_shotlogs) # data exploration function 5
+```
+
+**Data Exploration - Miscellaneous**
+```{r}
+maxDist <- max(NBA_shotlogs$SHOT_DIST) 
+print(paste("Farthest shot distance (in the data set): ", maxDist, " ft.")) # data exploration function 6
+
+print(paste("Total Made Shots: ", sum(NBA_shotlogs$SHOT_RESULT=='made'))) # data exploration function 7
+
+print(paste("Total Missed Shot: ", sum(NBA_shotlogs$SHOT_RESULT=='missed'))) # data exploration function 8
+```
+
+Data Visualization - Shot Made Column Distribution
+```{r}
+plot(factor(NBA_shotlogs$SHOT_RESULT),
+     main= "Shots Made/Missed") # data visual exploration function 1
+```
+
+Data Visualization - Touch Time Column Distribution
+```{r}
+plot(factor(NBA_shotlogs$TOUCH_TIME),
+     main= "Touch Time",
+     xlab= "time held the ball before shot (in sec)",
+     ylab= "freq.")  # data visual exploration function 2
+```
+
+Data Visualization - Dribbles Column Distribution
+```{r}
+plot(factor(NBA_shotlogs$DRIBBLES),
+     main= "Dribbles before shot",
+     xlab="number of dribbles",
+     ylab= "freq.")  # data visual exploration function 3
+```
+
+Data Visualization - Shot Distance Column Distribution
+```{r}
+plot(factor(NBA_shotlogs$SHOT_DIST),
+     main= "Shot Distance",
+     xlab= "distance from the hoop (in ft.)",
+     ylab= "freq.")  # data visual exploration function 4
+```
+
+Data Visualization - Closest Defender Distance Column Distribution
+```{r}
+plot(factor(NBA_shotlogs$CLOSE_DEF_DIST),
+     main= "Closest Defender Distance",
+     xlab= "distance from the shooter (in ft.)",
+     ylab= "freq.")  # data visual exploration function 5
+```
+
+Data Visualization - Shot Clock Column Distribution
+```{r}
+plot(factor(NBA_shotlogs$SHOT_CLOCK),
+     main= "Shot Clock",
+     xlab= "time left in shot clock (in sec.)",
+     ylab= "freq.")  # data visual exploration function 5
+```
+
+### Step 4.0 - Dividing into train and test sets.
+Divide data randomly. 75% into train and  25% into test.
+```{r}
+set.seed(1234)
+i <- sample(1:nrow(NBA_shotlogs), nrow(NBA_shotlogs)*0.75, replace=FALSE)
+train <- NBA_shotlogs[i,] # 75% in train
+test <- NBA_shotlogs[-i,] # 25% in test
+```
+
+
+### Step 4.1 - Logistic Regression Model
+Logistic Regression Model exhibits good probabilistic output and is computationally inexpensive. The simplicity of Logistic regression and effectiveness only works optimally on linear data. With  However, it can prove to have poor performance on nonlinear data. 
+```{r}
+glm <- glm(SHOT_RESULT ~ TOUCH_TIME + DRIBBLES + SHOT_DIST + CLOSE_DEF_DIST + SHOT_CLOCK, data=train, family="binomial")
+summary(glm)
+```
+
+**Logistic Regression Model Evaluation on Test**
+```{r}
+probsglm <- predict(glm, newdata=test, type="response")
+predsglm <- ifelse(probsglm > 0.5, "missed", "made")
+
+library(caret)
+confusionMatrix(factor(predsglm), factor(test$SHOT_RESULT))
+accglm <- mean(predsglm == test$SHOT_RESULT)
+print(paste("Accuracy Logistic Regression: ", accglm))
+```
+
+Logistic Regression Model resulted in an accuracy of 0.6095, Sensitivity of 0.4805, and Specificity of 0.7144. The accuracy being moderate rather than strong clearly roots from the models poor performance because of the data's nonlinearity.
+
+
+### Step 4.2 - Naive Bayes Model
+I selected the Naive Model for its real-time predicting as it can prove to be very fast in terms of performance but is weak when predictors are not independent (naive assumption). I, also, selected Naive Bayes as to act as a good **baseline** in comparing performances of other classification algorithms.
+```{r}
+library(e1071)
+nb <- naiveBayes(SHOT_RESULT ~ TOUCH_TIME + DRIBBLES + SHOT_DIST + CLOSE_DEF_DIST + SHOT_CLOCK, data=train)
+```
+
+**Naive Bayes Model Evaluation on Test**
+```{r}
+p1 <- predict(nb, newdata=test, type="class")
+
+library(caret)
+table_nb <- confusionMatrix(p1, test$SHOT_RESULT)
+table_nb
+accnb <- mean(p1 == test$SHOT_RESULT)
+print(paste("Naive Bayes Accuracy: ", accnb))
+```
+
+Naive Bayes Model resulted in an accuracy of 0.5937, Sensitivity of 0.4921, and Specificity of 0.6763. Here, the accuracy was really close to that of Logistic Regression. Poor performance of this model can be attributed to the naive assumption of predictors. 
+  
+
+### Step 4.3 - kNN Classification Model
+I selected the kNN Classification Model for its advantages in making no assumptions about the shape of the data. However, because I am using it with high dimensions, it could possibly suffer from poor performance.
+```{r}
+set.seed(1234)
+
+library(caret)
+
+train_knn <- NBA_shotlogs[i, c(11,10,12,17,9)]
+test_knn <- NBA_shotlogs[-i, c(11,10,12,17,9)]
+trainlabels_knn <- NBA_shotlogs[i, 14]
+testlabels_knn <- NBA_shotlogs[-i, 14]
+
+library(class)
+knn_pred <- knn(train=train_knn, test=test_knn, cl=trainlabels_knn, k=1)
+
+
+# kNN Classification Model Evaluation on Test
+results_knn <- (knn_pred == testlabels_knn)
+accknn <- length(which(results_knn ==TRUE)) / length(results_knn)
+table(factor(knn_pred), factor(testlabels_knn))
+table_knn <- confusionMatrix(knn_pred, test$SHOT_RESULT)
+table_knn
+print(paste("kNN Classification Accuracy: ", accknn))
+```
+
+kNN Classification Model resulted in an accuracy of 0.5438, Sensitivity of 0.5010, and Specificity of 0.5786. In the case of kNN classification, the accuracy proved to be lower than both logistic regression and naive bayes. This is most likely due to the high dimensions and un-scaled data when creating the model.
+
+### Step 5 - Results Analysis
+#### Metrics Comparison:
+**Accuracy:**
+- Logistic Regression: 0.6095
+- Naive Bayes: 0.5937
+- kNN Classification: 0.5438
+
+**Sensitivity (True Positive Rate):**
+- Logistic Regression: 0.4805          
+- Naive Bayes: 0.4921
+- kNN Classification: 0.5010
+
+**Specificity (True Negative Rate):**
+- Logistic Regression: 0.7144
+- Naive Bayes: 0.6763
+- kNN Classification: 0.5786
+
+Overall, it seems the Logistic Regression did the best in terms of accuracy. However, Naive Bayes was right behind by thousandths. kNN Classification lagged behind Logistic and Naive Bayes even though it didn't make assumptions about the data which was surprising. It's important to note that even though Logistic Regression achieved the best accuracy and specificity, kNN had the best sensitivity when evaluated on the test data.
+
+As stated, Logistic Regression Model exhibits the strengths of being computationally inexpensive and good probabilistic output. Furthermore, it is able to separate classes well as long as they can be linearly separable. The data set most likely performed better with Logistic Regression Model, due to the fact that its disadvantages was less impactful to the disadvantages of Naive Bayes and kNN Classification.
+
+The script was able to identify a moderate accuracy between the target, SHOT_RESULT, and the predictors,TOUCH_TIME, DRIBBLES, SHOT_DIST, CLOSE_DEF_DIST, and SHOT_CLOCK. These findings will most likely not be too useful outside of learning from this specific set of data, however, if proper measures were taken such as selecting fewer dimensions or scaling for kNN, would likely increase effectiveness of models and accuracy of the evaluation.
+
+

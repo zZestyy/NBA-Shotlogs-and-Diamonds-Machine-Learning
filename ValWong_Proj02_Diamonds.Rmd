@@ -1,0 +1,211 @@
+---
+title: "Proj 2 - Diamonds"
+author: "Val Wong - vmw170030"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+## Diamonds Data Set
+A dataset containing the prices and other attributes of almost 54,000 diamonds.
+
+Sources: https://vincentarelbundock.github.io/Rdatasets/articles/data.html
+
+### Step 1 - Loading the data
+```{r}
+Diamonds <- read.csv("diamonds.csv")
+numOfRows <- NROW(Diamonds) 
+print(paste("Total Number of Rows in Diamonds: ", numOfRows, " rows."))
+```
+
+### Step 2 - Data Cleaning
+The Diamonds data set has been cleaned beforehand and contains no NA values. However let's determine if the columns we are interested in contain outliers.
+```{r}
+# Check NAs
+print("Overall NAs:")
+sum(is.na(Diamonds) == TRUE)
+
+par(mfrow=c(1,2))
+boxplot(Diamonds$price, main="Price")
+boxplot(Diamonds$carat, main="Carat")
+boxplot(Diamonds$x, main="Length in mm")
+boxplot(Diamonds$y, main="Width in mm")
+boxplot(Diamonds$z, main="Depth in mm")
+```
+ It's important to keep in mind the clear amount of outliers in price and carat as it will be evident in the regression models. 
+
+### Step 3 - Data Exploration
+Display Column Names and Structure of NBA Shot logs data set.
+```{r}
+names(Diamonds) # data exploration function 1
+str(Diamonds) # data exploration function 2
+```
+
+**Preview First and Last Few Rows**
+```{r}
+head(Diamonds) # data exploration function 3
+tail(Diamonds) # data exploration function 4
+```
+
+**Summary of entire Diamonds data set.**
+```{r}
+summary(Diamonds) # data exploration function 5
+```
+
+**Data Exploration - Miscellaneous**
+```{r}
+print(paste("Average Price of Diamonds: $", mean(Diamonds$price))) # data exploration function 6
+
+print(paste("Average Carat of Diamonds: ", mean(Diamonds$carat))) # data exploration function 7
+```
+
+Data Visualization - Price Column Distribution
+```{r}
+plot(factor(Diamonds$price),
+     main= "Price of Diamonds",
+     xlab= "price in $",
+     ylab= "freq.") # data visual exploration function 1
+```
+
+Data Visualization - Carat Column Distribution
+```{r}
+plot(factor(Diamonds$carat),
+     main= "Carat of Diamonds",
+     xlab= "Carat",
+     ylab= "freq.") # data visual exploration function 1
+```
+
+Data Visualization - Length Column Distribution
+```{r}
+plot(factor(Diamonds$x),
+     main= "Length of Diamonds",
+     xlab= "length in mm",
+     ylab= "freq.") # data visual exploration function 2
+```
+
+Data Visualization - Width Column Distribution
+```{r}
+plot(factor(Diamonds$y),
+     main= "Width of Diamonds",
+     xlab= "width in mm",
+     ylab= "freq.") # data visual exploration function 3
+```
+
+Data Visualization - Depth Column Distribution
+```{r}
+plot(factor(Diamonds$z),
+     main= "Depth of Diamonds",
+     xlab= "depth in mm",
+     ylab= "freq.") # data visual exploration function 4
+```
+
+### Step 4.0 - Dividing into train and test sets.
+Divide data randomly. 75% into train and  25% into test.
+```{r}
+set.seed(1234)
+i <- sample(1:nrow(Diamonds), nrow(Diamonds)*0.75, replace=FALSE)
+train <- Diamonds[i,] # 75% in train
+test <- Diamonds[-i,] # 25% in test
+```
+
+### Step 4.1 - Linear Regression
+I selected the linear regression model for the relative simplicity of the algorithm and to act as a good baseline comparison to other regression algorithms. Furthermore, with diamonds and pricing relationship, the presumption that bigger diamonds would yield higher price can strengthen a case for data exbiting a linear pattern.
+```{r}
+set.seed(1234)
+lm <- lm(price ~ carat + x + y + z, data=train)
+summary(lm)
+```
+
+Evaluation on Test
+```{r}
+set.seed(1234)
+predlm <- predict(lm, newdata=test)
+corlm <- cor(predlm, test$price)
+mselm <- mean((predlm - test$price)^2)
+rmselm <- sqrt(mean((predlm - test$price)^2))
+
+print(paste("Linear Regression COR: ", corlm))
+print(paste("Linear Regression MSE: ", mselm))
+print(paste("Linear Regression RMSE: ", rmselm))
+```
+
+Linear Regression Model resulted in an correlation value of 0.922758755303959, MSE of 2380014.33574145, and RMSE of 1542.72950828765. The correlation value being so close to 1 illustrates that the model and evaluation on the test data are pretty similar in relationship (strong positive). The MSE and RMSE indicate high residual values which can be seen in huge jumps of price values in the data set.
+
+### Step 4.2 - kNN Regression
+I selected kNN regression for its advantage in assuming no shape concerning the data. However, its important to acknowledge the sensitivity of the algorithm to outliers as it chooses neighbors based on distance. 
+```{r}
+library(caret)
+
+# carat = 2, price = 8, x = 9, y = 10, z = 11
+knnreg <- knnreg(train[c(2,9,10,11)], train[,8], k=1)
+
+predknn <- predict(knnreg, test[c(2,9,10,11)])
+corknn <- cor(predknn, test$price)
+mseknn <- mean((predknn - test$price)^2)
+rmseknn <- sqrt(mean((predknn - test$price)^2))
+
+print(paste("kNN Regression COR: ", corknn))
+print(paste("kNN Regression MSE: ", mseknn))
+print(paste("kNN Regression RMSE: ", rmseknn))
+```
+
+kNN Regression Model resulted in an correlation value of 0.897254333737754, MSE of 3275547.92933657, and RMSE of 1809.84748786647. The resulting correlation value is lower than linear regression model but is still close to 1 illustrating that the model and evaluation on the test data are pretty similar in relationship (strong positive). The outliers are also more impactful in this algorithm as predicted illustrated in the higher values of MSE and RMSE.
+
+### Step 4.3 - Decision Tree (Regression)
+I selected the Decision Tree algorithm for the advantage of being easy to interpret and performing without the requirement of normalization of the data. 
+```{r}
+library(tree)
+tree <- tree(price ~ carat + depth, data=train)
+summary(tree)
+```
+
+Evaluate
+```{r}
+predtree <- predict(tree, newdata=test)
+cortree <- cor(predtree, test$price)
+msetree <- mean((predtree - test$price)^2)
+rmsetree <- sqrt(mean((predtree - test$price)^2))
+
+print(paste("Tree Regression COR: ", cortree))
+print(paste("Tree Regression MSE: ", msetree))
+print(paste("Tree Regression RMSE: ", rmsetree))
+```
+
+Tree Pruning
+```{r}
+tree_pruned <- prune.tree(tree, best=5)
+
+predtreepruned <- predict(tree_pruned, newdata=test)
+cortreepruned <- cor(predtreepruned, test$price)
+msetreepruned <- mean((predtreepruned - test$price)^2)
+rmsetreepruned <- sqrt(mean((predtreepruned - test$price)^2))
+
+print(paste("Tree Regression COR: ", cortreepruned))
+print(paste("Tree Regression MSE: ", msetreepruned))
+print(paste("Tree Regression RMSE: ", rmsetreepruned))
+```
+
+The normal tree and pruned tree outputted the same results which is acceptable as pruning the tree has no guarantee of improving performance. Decision Tree Model resulted in an correlation value of 0.922150171471487, MSE of 2395913.01360515, and RMSE of 1547.873707253. The correlation value achieved by Decision tree was almost exact as linear regression which could likely show that the data set isn't particularly linear in shape otherwise would give linear model a bigger advantage. Additionally, we continue to see the effects of outliers within the model's high MSE and RMSE values.
+
+### Step 5 - Results Analysis
+#### Metrics Comparison:
+**Correlation:**
+- Linear Regression: 0.922758755303959
+- kNN Regression: 0.897254333737754
+- Decision Tree Regression: 0.922150171471487
+
+**MSE:**
+- Linear Regression: 2400312.93680125
+- kNN Regression: 3275547.92933657
+- Decision Tree Regression: 2395913.01360515
+
+**RMSE:**
+- Linear Regression: 1549.29433510913
+- kNN Regression: 1809.84748786647
+- Decision Tree Regression: 1547.873707253
+
+Overall, the Linear Regression model and Decision tree model were neck and neck but Linear Regression did just a tad bit better in terms of correlation. kNN Regression definitely performed poorest due to the sensitivity to outliers which this data set was a victim to. Also restating, the correlation value achieved was almost exact as linear regression which could likely show that the data set isn't particularly linear in shape otherwise would give linear model a bigger advantage. 
+
+The script was able to identify notable weaknesses and strengths of the algorithms but in terms of what it was able to learn from the data, would be considered not useful. The outliers were a major factor of variance and residual impact on the models, exemplified even more for kNN Regression. 
+
